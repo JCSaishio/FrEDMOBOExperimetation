@@ -17,10 +17,23 @@ not when the code is written.
   `l_f`, `v_f,0`, `d*`; power column mapping). JSON round-trip. `space.py`: raw ↔ unit cube; `R`
   from set-points; 3D rotated coordinates behind a flag with linear constraints.
   *Accept:* round-trip test; `R` test against hand calculation; 3D parallelogram constraint test.
-  > **Blocked on open items A1 and A3** — the preform diameter `d_in` is provisional (7 mm,
-  > to be confirmed) and the effective spool diameter under load is unresolved. The `R` hand
-  > calculation cannot be checked against a known-good value until these land. Build the machinery
-  > and parametrize it; leave the numeric acceptance assertion `xfail` until then.
+
+  **Partially complete — 1 of 3 acceptance tests met.**
+  - [x] JSON round-trip — `tests/test_config.py`, 29 tests.
+  - [x] *(beyond the stated criterion)* raw ↔ unit-cube map — `tests/test_space.py`, 13 tests.
+  - [ ] `R` against hand calculation — **blocked on open item A3**.
+  - [ ] 3D parallelogram constraint — **blocked on A3, transitively**.
+
+  > Only **A3** blocks this milestone, not A1. `d_in` enters `d_out = d_in/√R`, which lives in
+  > the emulator at M3; `R` itself needs the *effective* spool diameter, which is A3. The core
+  > diameter (15 mm) and the value the observed drawdown implies (~34 mm) disagree by 2.3×, and
+  > §4.1 calls `R` "the leading quantity for the constraint", so guessing would propagate into
+  > the constraint model, the iso-diameter inversion and the 3D coordinates.
+  >
+  > `space.draw_ratio` and `space.linear_constraints` therefore raise `NotImplementedError`
+  > naming A3, rather than being written against a guessed constant. The acceptance test
+  > `test_draw_ratio_against_hand_calculation` is `xfail(strict=True)`, so it will fail loudly
+  > the moment the value lands and the implementation appears.
 
 - [ ] **M2 — extraction + power**
   Algorithm 1; distinct-reading logic; equations (1)–(3); onset suggestion (Appendix A); power-log
