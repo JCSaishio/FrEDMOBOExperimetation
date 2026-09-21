@@ -8,42 +8,41 @@ always say exactly where to resume.
 ## Where to resume
 
 **Next step: M3's I/O layer — the device-CSV writer *and* the power-log writer — in `simulate.py`.**
-Neither depends on an open item. The power-log format is now fixed by
-`docs/POWER_LOG_REQUIREMENTS.docx` (F1–F10) with `data/examples/power_log_example.csv` as the
-exact shape; the device-CSV format is `data/examples/fred_experiment_withgraphing.csv` (`;`,
-decimal comma, ~43 Hz log against ~3 Hz sample-and-hold vision, 5.3 µm lattice). Together they
-are every fixture M2's extraction and alignment tests need. The drawdown relation itself stays
-behind G1.
+Neither depends on an open item. The power-log format is fixed by
+`docs/POWER_LOG_REQUIREMENTS.docx` (F1–F10) and `PowerConfig`'s defaults; the device-CSV format is
+`data/examples/fred_experiment_withgraphing.csv` (`;`, decimal comma, ~43 Hz log against ~3 Hz
+sample-and-hold vision, 5.3 µm lattice). Together they are every fixture M2's extraction and
+alignment tests need. The drawdown relation itself stays behind G1.
 
-**If G1 is answered first, do that instead:** implement `space.draw_ratio` (hand value
-`R = π·15·30/(34.558·0.30) = 136.4` on the bare core at 30 RPM), delete the `xfail` on
-`tests/test_space.py::test_draw_ratio_against_hand_calculation`, implement
-`space.linear_constraints`, and close M1. Under option B (R as the design variable) the box in
-`space.py` is on R and the intake gains a per-run `d_eff_mm`; under option A it is on `ω_s` with
-`d_spool_mm` fixed. Read `FrED_MOBO_Open_Items.docx` item G1 for the user's choice.
+**If G1 is answered first, do M1 instead.** The user's Rev. 3 reply prefers `ω_s`; the Rev. 4
+recommendation is option A (keep `ω_s`, "empty the spool before every run, same run length",
+`R` from the set-point through `D_mid = D_core + ΔD/2` with `ΔD = 48.5/D` mm per 180 s run — or,
+better, from the logged turns at the window midpoint). Hand value for the acceptance test on the
+bare core: `R = π·15·30/(34.558·0.30) = 136.4`; at `D_mid = 16.62` it is 151.0. Under A+ (sleeve)
+or B the signature is the same kinematic core with a different `d_eff_mm` source. Read
+`FrED_MOBO_Open_Items.docx` item G1 for the user's choice. **If H1 is accepted**, the intake's
+per-run fields (`d_start_mm`, `d_end_mm`, wound width, micrometer readings) come before M3, so the
+calibration runs go straight into the database.
 
-**Open-items state (Rev. 3, 21 Sep 2026).** All 29 Rev. 2 answers were read back and responded
-to; the document one level up is now Rev. 3 with 32 items and ten yellow REPLY rows awaiting the
-user: A2, A3, A4, E1, E3, E4, E5, G1, G2, G3. Read them back with the regex
-`REPLY ([A-G]\d+):\s*(.*)` on the first cell of every table row; the sentinel is
-`[ type your reply here ]`. What each answer changed in code, so nothing is applied twice:
+**Open-items state (Rev. 4, 21 Sep 2026).** 33 items; three yellow REPLY rows await the user:
+**A2** (upper bound of the temperature box), **G1** (spool protocol and variable), **H1**
+(calibration runs). Read them back with `REPLY ([A-H]\d+):\s*(.*)` on the first cell of every
+table row; sentinel `[ type your reply here ]`. What the Rev. 3 replies changed in code:
 
-| Item | Answer | Applied to |
+| Item | Reply | Applied to |
 |---|---|---|
-| A1 | `d_in = 7 mm` confirmed | `DeviceConfig` docstring; no longer provisional |
-| A3 | core 15 mm, full ≈ 33 mm, 20 mm traverse, "estimate for now" | DECISIONS D10; `space.py` block renamed to G1 |
-| A4 | `ℓ_f = π·11 = 34.558 mm/rev` | `DeviceConfig.l_f_mm_per_rev`; DECISIONS D8 |
-| B1, B5 | PCB "most likely"; drop PX, PM only | DECISIONS D9 — **code untouched until G2 confirmed** |
-| B2–B4 | (moot under PM) | nothing; closed |
-| B6–B9 | requirements file requested | `docs/POWER_LOG_REQUIREMENTS.docx`, `data/examples/power_log_example.csv` |
-| C4 | mode B, band editable | already the default; mode A stays a config option (G3) |
-| D1 | mask, surface the count | already DECISIONS D3; range still E5 |
-| E2 | (explained) `f₁` ideal 0 / nadir 0.15 | already the `default_2d_campaign` values |
-| F3 | all installs approved | memory only |
+| A2 | EVA; draws from 90 °C; 150 °C safety limit | `default_2d_campaign` box `[90, 120]` (upper provisional); D11 |
+| A3 | facts confirmed; spool emptied between runs; sample sensor uncalibrated | D10 amended; the 23 mm inference withdrawn |
+| A4 | no gearbox; 11 mm is the head's outer diameter | `l_f` kept at 34.558 as an **upper bound**; H1 measures it |
+| E1 | 0.25 mm has been made "depending on temp"; keep ≈ 0.40 | `d_star_mm = 0.40`; sessions 2–3 provisionally 0.30 / 0.50 after H1 |
+| E3 | 0.15 mm confirmed | already in config |
+| E4 | warn 3 °C; band 1 °C (reaffirmed) | `delta_t_warn_c = 3.0`, `delta_t_c = 1.0`; D12 |
+| E5 | ±10 °C; low-pass suggested | `temp_setpoint_tolerance_c = 10`, `temp_plausible_c = (0, 160)`; no filter; D13 |
+| G2 | Yes | PX removed from `config.py`/`power.py`/tests; PLAN M2/M10; D9 confirmed |
+| G3 | Yes | mode A parked; PLAN M10 |
+| G1 | prefers `ω_s`; asks for more options | re-opened with options A/A+/B/C/D; nothing in code |
 
-Not yet applied, waiting on a reply: the temperature box (A2), the `d*` list (E1: 0.40 first is
-the user's provisional choice — `default_2d_campaign(d_star_mm=0.35)` still carries the old
-placeholder), `delta_t_warn_c` and `delta_t_c` (E4), `temp_plausible_c` (E5: proposed [40, 130]).
+`pytest`: 83 passed, 1 xfailed.
 
 ---
 
@@ -114,9 +113,8 @@ suite rather than silently absent, and carries the parked acceptance test as
 - Git identity is set **repo-locally** (DECISIONS D5) to the GitHub noreply address, so the
   institutional email is not published in the history of a public repo. Say so if a different
   authorship is wanted — the history is one commit deep and can still be rewritten cheaply.
-- 32 open items are tracked in `../../FrED_MOBO_Open_Items.docx` (Rev. 3). The one that gates
-  everything is **G1** — which variable the GP sees now that the spool diameter is known to vary
-  by a factor 2.2 over a campaign. G2 (PX removed) and E5 (temperature mask range) are the other
-  two that move code as soon as they are answered.
+- 33 open items are tracked in `../../FrED_MOBO_Open_Items.docx` (Rev. 4). **G1** (spool
+  protocol and design variable) gates M1; **H1** (calibration runs) decides `ω_f`, the session
+  targets and whether `l_f`'s bound needs replacing; **A2** is one number (the box's upper bound).
 - The repo has no licence yet (`README.md` says so). It is public, so this is worth deciding
   before there is anything in it worth copying.

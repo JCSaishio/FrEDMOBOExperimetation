@@ -15,6 +15,7 @@ from fred_mobo.config import (
     ConstraintConfig,
     DeviceConfig,
     ExtractionConfig,
+    POWER_LOG_COLUMNS,
     KernelConfig,
     Objective,
     PowerConfig,
@@ -52,20 +53,21 @@ def test_round_trip_preserves_optional_and_tuple_fields(tmp_path) -> None:
         extraction=ExtractionConfig(
             d_star_mm=0.35,
             temp_plausible_c=(20.0, 130.0),
-            delta_t_warn_c=3.0,
+            temp_setpoint_tolerance_c=None,
+            delta_t_warn_c=2.5,
         ),
         power=PowerConfig(
-            source="PX",
-            columns={"heater_current": "Heater current (A)"},
-            p_h_max_w=48.0,
-            p_f0_w=1.5,
-            spooler_calibration=[(25.0, 0.31), (50.0, 0.58)],
+            columns={**POWER_LOG_COLUMNS, "heater_a": "I_heater [A]"},
+            separator=",",
+            decimal=".",
+            offset_s=1.25,
         ),
     )
     restored = CampaignConfig.from_json(original.to_json())
     assert restored == original
     assert restored.extraction.temp_plausible_c == (20.0, 130.0)
-    assert restored.power.spooler_calibration == [(25.0, 0.31), (50.0, 0.58)]
+    assert restored.extraction.temp_setpoint_tolerance_c is None
+    assert restored.power.columns["heater_a"] == "I_heater [A]"
 
 
 def test_json_is_human_readable_and_sorted() -> None:
@@ -222,25 +224,51 @@ def test_diameter_band_defaults_to_the_spec_multiples() -> None:
     assert hi == pytest.approx(0.56)
 
 
-def test_default_campaign_uses_mode_b_and_px() -> None:
-    """§9.5: until the power PCB exists the campaign runs PX / mode B."""
+def test_default_campaign_uses_mode_b_and_pm() -> None:
+    """Open items G2/G3 (21 Sep 2026): the first campaign runs PM / mode B; PX was removed (D9)."""
     config = default_2d_campaign()
     assert config.constraint.mode == "B"
-    assert config.power.source == "PX"
+    assert config.power.source == "PM"
 
 
-def test_px_power_is_flagged_incomplete_until_m3_constants_land() -> None:
-    """Open items B2, B3, B4. Incomplete is the expected state, not an error."""
-    assert default_2d_campaign().power.is_complete is False
-    complete = PowerConfig(
-        source="PX", p_h_max_w=48.0, p_f0_w=1.5, spooler_calibration=[(25.0, 0.3), (50.0, 0.6)]
-    )
-    assert complete.is_complete is True
+def test_power_columns_default_to_the_requirements_file_names() -> None:
+    """docs/POWER_LOG_REQUIREMENTS.docx F2 names, F1 dialect, F6 markers — config, not hard-coded."""
+    power = default_2d_campaign().power
+    assert power.columns["heater_v"] == "Heater voltage (V)"
+    assert power.columns["event"] == "Event"
+    assert (power.separator, power.decimal) == (";", ",")
+    assert (power.run_start_marker, power.run_stop_marker) == ("RUN_START", "RUN_STOP")
 
 
-def test_temperature_mask_is_off_by_default() -> None:
-    """DECISIONS D3: the mask is a no-op until open item E5 supplies a range."""
-    assert default_2d_campaign().extraction.temp_plausible_c is None
+def test_power_mapping_must_name_every_role() -> None:
+    """A dropped voltage column would silently turn a power into a current."""
+    columns = dict(POWER_LOG_COLUMNS)
+    del columns["spooler_v"]
+    with pytest.raises(ConfigError, match="spooler_v"):
+        PowerConfig(columns=columns).validate()
+
+
+def test_px_is_no_longer_a_valid_power_source() -> None:
+    """DECISIONS D9, confirmed by the user in open item G2."""
+    with pytest.raises(ConfigError, match="PX"):
+        PowerConfig(source="PX").validate()  # type: ignore[arg-type]
+
+
+def test_temperature_masks_carry_the_e5_answers() -> None:
+    """DECISIONS D3/D13: absolute guard [0, 160] °C, ±10 °C around the set-point in the window."""
+    extraction = default_2d_campaign().extraction
+    assert extraction.temp_plausible_c == (0.0, 160.0)
+    assert extraction.temp_setpoint_tolerance_c == pytest.approx(10.0)
+    assert extraction.delta_t_warn_c == pytest.approx(3.0)
+
+
+def test_default_box_and_target_follow_the_answers() -> None:
+    """A2: EVA draws from 90 °C, safety limit 150 °C → box [90, 120] (upper provisional). E1: d* = 0.40."""
+    config = default_2d_campaign()
+    temp = next(v for v in config.variables if v.name == "T")
+    assert (temp.lower, temp.upper) == (90.0, 120.0)
+    assert config.extraction.d_star_mm == pytest.approx(0.40)
+    assert config.constraint.delta_t_c == pytest.approx(1.0)
 
 
 def test_objective_normalization_maps_ideal_and_nadir_to_zero_and_one() -> None:

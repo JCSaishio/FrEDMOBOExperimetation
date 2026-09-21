@@ -35,9 +35,24 @@ __all__ = [
 
 SCHEMA_VERSION = 1
 
+POWER_LOG_COLUMNS: dict[str, str] = {
+    "time_s": "Time (s)",
+    "heater_v": "Heater voltage (V)",
+    "heater_a": "Heater current (A)",
+    "spooler_v": "Spooler voltage (V)",
+    "spooler_a": "Spooler current (A)",
+    "extruder_v": "Extruder voltage (V)",
+    "extruder_a": "Extruder current (A)",
+    "event": "Event",
+}
+"""Role → header name, exactly as docs/POWER_LOG_REQUIREMENTS.docx F2 specifies them."""
+
 ConstraintMode = Literal["A", "B"]
 KernelForm = Literal["matern52", "rbf"]
-PowerSource = Literal["PM", "PX"]
+PowerSource = Literal["PM"]
+"""Only PM (the PCB's own V·I log). Mode PX was removed on the user's instruction, open items
+B5/G2, 21 Sep 2026 (DECISIONS D9). Kept as a Literal because ``power_source`` is still a
+per-run column of the record's schema (§6.1)."""
 
 
 class ConfigError(ValueError):
@@ -149,8 +164,15 @@ class ConstraintConfig:
     outcome: str = "diameter_mm"
     lower: float | None = None
     upper: float | None = None
-    delta_t_c: float = 5.0
-    """Temperature neighbourhood for the R-band of §4.2: nearby temperatures share a band."""
+    delta_t_c: float = 1.0
+    """Temperature neighbourhood for the R-band of §4.2: nearby temperatures share a band.
+
+    The record's default is 5 °C. The user set 1 °C on 21 Sep 2026 (open item E4, reaffirmed
+    after push-back): a 1 °C change alters the melt's viscosity enough that a failure at 96 °C
+    should not constrain 94 °C. Consequence, recorded in DECISIONS D12: with ~26 runs the
+    neighbourhood will rarely contain a declared failure, so the R-band suggestion seldom fires
+    and feasibility rests mainly on the diameter band. Editable at any time.
+    """
 
     def validate(self) -> None:
         if self.mode not in ("A", "B"):
@@ -244,20 +266,35 @@ class DeviceConfig:
 
 @dataclass(frozen=True)
 class ExtractionConfig:
-    """Section A defaults (§2.3).
+    """Section A defaults (§2.3), with the values the user set on 21 Sep 2026.
 
-    ``temp_plausible_c`` implements DECISIONS D3: physically impossible temperature readings are
-    masked and the masked count is surfaced, rather than silently cleaned. The range itself is
-    open item E5; while it is ``None`` the mask is a no-op and no temperature row is dropped.
+    ``d_star_mm`` = 0.40 mm is the first target session (open item E1).
+
+    Two temperature masks implement DECISIONS D3/D13 — both drop rows before the achieved-mean
+    diagnostic is computed, both surface their counts, neither touches the diameter statistics:
+
+    * ``temp_plausible_c``: absolute range applied to the whole trace. Outside it a reading
+      cannot be the block at all (below a lab's ambient, or above the 150 °C machine safety
+      limit plus margin), so it is the sensor.
+    * ``temp_setpoint_tolerance_c``: applied inside the steady-state window only. A reading more
+      than this far from the set-point during the plateau is attributed to the sensor, not the
+      heater (the user's 10 °C, open item E5). It is not applied outside the window, where the
+      warm-up transient is legitimately far from the set-point.
+
+    No low-pass filter is applied (asked in E5): the window mean already is one, a linear filter
+    would not change it, and §2.3 forbids modelling the signal. The plateau standard deviation is
+    reported instead so the noise level stays visible.
+
+    ``delta_t_warn_c`` = 3 °C: intake warns when |T_achieved − T_setpoint| exceeds it (§2.3; E4).
     """
 
-    d_star_mm: float = 0.35
+    d_star_mm: float = 0.40
     guard_s: float = 5.0
     w_min_s: float = 30.0
     d_plausible_mm: tuple[float, float] = (0.05, 2.0)
-    temp_plausible_c: tuple[float, float] | None = None
-    delta_t_warn_c: float | None = None
-    """Intake warns when |T_achieved - T_setpoint| exceeds this (§2.3). Open item E4."""
+    temp_plausible_c: tuple[float, float] | None = (0.0, 160.0)
+    temp_setpoint_tolerance_c: float | None = 10.0
+    delta_t_warn_c: float | None = 3.0
 
     def validate(self) -> None:
         if self.d_star_mm <= 0:
@@ -276,6 +313,8 @@ class ExtractionConfig:
             tlo, thi = self.temp_plausible_c
             if not (tlo < thi):
                 raise ConfigError(f"temp_plausible_c must be ordered, got {self.temp_plausible_c}")
+        if self.temp_setpoint_tolerance_c is not None and self.temp_setpoint_tolerance_c <= 0:
+            raise ConfigError("temp_setpoint_tolerance_c must be positive")
         if self.delta_t_warn_c is not None and self.delta_t_warn_c <= 0:
             raise ConfigError("delta_t_warn_c must be positive")
 
@@ -286,43 +325,39 @@ class ExtractionConfig:
 
 @dataclass(frozen=True)
 class PowerConfig:
-    """Section A.4. Which source, and the column mapping for the power log.
+    """Section A.4. Mode PM only, and the column mapping for the PCB's power log.
 
-    HARDWARE-UNVALIDATED (§9.5): ``columns`` exists precisely because the real header names,
-    sample rate and marker format are expected to differ from these defaults. They are never
-    hard-coded, so a schema change is a config edit plus one fixture update.
+    The defaults are the names, dialect and markers of ``docs/POWER_LOG_REQUIREMENTS.docx``
+    (F1, F2, F6), which is also the format the emulator writes and ``data/examples/
+    power_log_example.csv`` shows. HARDWARE-UNVALIDATED (§9.5): the real board's file may still
+    differ, which is why every one of these is a config value and none is hard-coded — a schema
+    change is a config edit plus one fixture update.
 
-    ``p_h_max_w``, ``p_f0_w`` and ``spooler_calibration`` are the mode-PX constants. All three
-    are unmeasured (open items B2, B4, B3) and are ``None`` until experiments session M3.
+    ``columns`` maps the software's role names to the file's header strings. All seven roles
+    must be present; ``validate`` refuses a mapping that drops one, because a missing voltage
+    would silently turn a power into a current.
     """
 
-    source: PowerSource = "PX"
-    columns: dict[str, str] = field(default_factory=dict)
-    p_h_max_w: float | None = None
-    p_f0_w: float | None = None
-    spooler_calibration: list[tuple[float, float]] | None = None
+    source: PowerSource = "PM"
+    columns: dict[str, str] = field(default_factory=lambda: dict(POWER_LOG_COLUMNS))
+    separator: str = ";"
+    decimal: str = ","
+    run_start_marker: str = "RUN_START"
+    run_stop_marker: str = "RUN_STOP"
     offset_s: float = 0.0
 
     def validate(self) -> None:
-        if self.source not in ("PM", "PX"):
-            raise ConfigError(f"power source must be 'PM' or 'PX', got {self.source!r}")
-        if self.spooler_calibration is not None and len(self.spooler_calibration) < 2:
-            raise ConfigError("spooler_calibration needs at least two points to interpolate")
-
-    @property
-    def is_complete(self) -> bool:
-        """True when this config can actually produce a power number.
-
-        Mode PX needs all three measured constants. False here is not an error — it is the
-        expected state until the M3 bench session, and the export flags such runs.
-        """
-        if self.source == "PM":
-            return bool(self.columns)
-        return (
-            self.p_h_max_w is not None
-            and self.p_f0_w is not None
-            and self.spooler_calibration is not None
-        )
+        if self.source != "PM":
+            raise ConfigError(
+                f"power source must be 'PM' (mode PX was removed, DECISIONS D9), got {self.source!r}"
+            )
+        missing = [role for role in POWER_LOG_COLUMNS if role not in self.columns]
+        if missing:
+            raise ConfigError(f"power column mapping is missing roles {missing}")
+        if not self.separator or not self.decimal or self.separator == self.decimal:
+            raise ConfigError("power log separator and decimal must be distinct and non-empty")
+        if not self.run_start_marker or not self.run_stop_marker:
+            raise ConfigError("power log run markers must be non-empty")
 
 
 # --------------------------------------------------------------------------------------------
@@ -425,9 +460,6 @@ class CampaignConfig:
             return None if value is None else (float(value[0]), float(value[1]))
 
         power_raw = dict(raw.get("power", {}))
-        calibration = power_raw.get("spooler_calibration")
-        if calibration is not None:
-            power_raw["spooler_calibration"] = [(float(a), float(b)) for a, b in calibration]
 
         extraction_raw = dict(raw.get("extraction", {}))
         if "d_plausible_mm" in extraction_raw:
@@ -479,17 +511,21 @@ def load(path: str | Path) -> CampaignConfig:
 # --------------------------------------------------------------------------------------------
 
 
-def default_2d_campaign(d_star_mm: float = 0.35) -> CampaignConfig:
-    """The phase-2D campaign of §1.1, with the record's stated defaults.
+def default_2d_campaign(d_star_mm: float = 0.40) -> CampaignConfig:
+    """The phase-2D campaign of §1.1, with the defaults as they stand after the 21 Sep 2026 answers.
+
+    Temperature box [90, 120] °C, not the record's [70, 100]: the EVA feedstock does not draw
+    below 90 °C and the machine's safety limit is 150 °C (open item A2; DECISIONS D11). The upper
+    bound is provisional — the user has been asked to confirm it.
 
     The power objective's reference point, ideal and nadir are placeholders: §5.1 freezes the
-    power side at 'worst pilot value + 10 %' after the first PM-mode pilot, which has not been
-    run (open item B5). The error side, 0.15 mm, comes from the design record.
+    power side at 'worst pilot value + 10 %' after the first PM pilot, which has not been run.
+    The error side, 0.15 mm, was confirmed on 21 Sep 2026 (open item E3).
     """
     band_lo, band_hi = ExtractionConfig(d_star_mm=d_star_mm).diameter_band()
     return CampaignConfig(
         variables=[
-            Variable("T", "heater temperature set-point", "degC", 70.0, 100.0),
+            Variable("T", "heater temperature set-point", "degC", 90.0, 120.0),
             Variable("omega_s", "spooler speed set-point", "RPM", 25.0, 50.0),
         ],
         objectives=[

@@ -122,7 +122,7 @@ The marked-preform advance over N revolutions would settle both, slip included.
 
 ---
 
-### D9 — Mode PX is removed; mode PM is the only power source *(pending confirmation, open item G2)*
+### D9 — Mode PX is removed; mode PM is the only power source *(CONFIRMED by the user, G2, 21 Sep 2026)*
 
 §2.4 builds both sources and records which one each run used; §9.5 says the first campaign runs in
 PX/B. On 21 Sep 2026 the user answered B5: "don't do the proxy anymore, just the measured power",
@@ -132,10 +132,13 @@ rather than left as dead paths; the emulator writes one power-log format — the
 `docs/POWER_LOG_REQUIREMENTS.docx` — which is also what the intake is tested against.
 
 The risk is stated in the open-items document (G2): if the PCB is late, `f₂` cannot be computed
-and the campaign cannot start; there is no bridge. This contradicts the record, so it is **not
-applied to code until the user confirms G2**. The config still accepts `source = "PX"` today.
+and the campaign cannot start; there is no bridge. The user confirmed G2 with "Yes". Applied:
+`PowerSource = Literal["PM"]`; the PX fields, `is_complete` and the calibration table are gone
+from `PowerConfig`; the column mapping, dialect and run markers default to the requirements file
+(`POWER_LOG_COLUMNS`) and `validate` refuses a mapping that drops a role. G3 ("PM/B for the first
+campaign, mode A parked") was confirmed in the same round; mode A stays a config option only.
 
-*Reverses if:* the user does not confirm G2, or the PCB slips past the retuned device.
+*Reverses if:* the PCB slips past the retuned device and a bridge is needed after all.
 
 ---
 
@@ -155,4 +158,77 @@ user as open item G1 with a recommendation (R). `space.draw_ratio` and `linear_c
 core; the full diameter and traverse are recorded here rather than in config until G1 decides
 whether they are constants or per-run inputs.
 
+**Amended after the Rev. 3 replies (21 Sep 2026).** Two facts and one correction: the spool *is
+emptied between runs*; the user prefers `ω_s`; and the fill per run does **not** depend on the
+set-point — `ΔD = 2·t·d_in²·v_f/(π·D·w)` with `w = 20 mm` the traverse, i.e. `48.5/D` mm per
+180 s run at `ω_f = 0.30` (+3.23 mm on the bare core at 25 RPM and at 50 RPM alike, checked
+numerically). So under an "empty before every run, same run length" protocol the spool is in the
+same state for every run and `R` is again a fixed function of `ω_s`, through the mid-run diameter
+`D_mid = D_core + ΔD/2 ≈ 16.6 mm`. The recommendation put to the user is therefore **reversed to
+option A (keep `ω_s`, formalise the protocol)**, with A+ (a ~33 mm sleeve, which cuts the
+within-run drift from +22 % to +4 % in R and puts 0.40 mm mid-box at `ω_f = 0.30`) and B (R as the
+variable, per-run measurement) as the alternatives. The "implied `D_eff ≈ 23 mm`" inference from
+the sample file is **withdrawn** — the user states its sensor was uncalibrated. Open item H1 (three
+calibration runs with a micrometer) is proposed to measure `d(ω_s)`, the effective `ℓ_f` and the
+fill per run before anything is built on the kinematic table.
+
 *Reverses if:* G1 is answered — then this becomes an implementation, not a decision.
+
+---
+
+### D11 — Temperature box `[90, 120] °C`, replacing the record's `[70, 100]`
+
+Open item A2 (21 Sep 2026): the feedstock is EVA hot-melt; it draws at 90 °C and not below; the
+machine's safety limit is 150 °C. A box starting at 70 °C would spend most of the Sobol design
+where nothing extrudes. The lower bound is the user's. The upper bound, 120 °C, is a proposal:
+it keeps the record's 30 °C span and stays 30 °C under the safety limit; the user has been asked
+to confirm or widen it (A2 reply row). Applied in `default_2d_campaign`; the emulator's `g(T)`
+will have no flow below 90 °C.
+
+*Reverses if:* the user sets a different upper bound — a one-line change.
+
+---
+
+### D12 — R-band neighbourhood `δ_T = 1 °C`, not the record's 5 °C
+
+§4.2 defaults the temperature neighbourhood of the mode-B R-band to 5 °C. The user set 1 °C
+(open item E4) and, after push-back on the statistical consequence, reaffirmed it on physical
+grounds: a 1 °C change alters the melt's viscosity enough that a failure at 96 °C should not
+constrain 94 °C. Applied as `ConstraintConfig.delta_t_c = 1.0`.
+
+Consequence, recorded so it is not a surprise: with ~26 runs over a 30 °C box and a handful of
+declared failures, a ±1 °C neighbourhood will rarely contain one, so the R-band *suggestion* of
+§4.2 will seldom fire and feasibility rests on the diameter-band outcome constraint and on the
+declared failures being visible on the (T, R) map of §4.3. A one-sided neighbourhood (a failure at
+`T_i` constraining only `T ≥ T_i` or only `T ≤ T_i`) would need no `δ_T` at all, but requires the
+*direction* of the temperature effect on breakage, which open item H1 would measure.
+
+*Reverses if:* failures near-repeat during the campaign and the user widens it (editable per
+campaign).
+
+---
+
+### D13 — Two temperature masks, no low-pass filter (supersedes the "range" part of D3)
+
+Open item E5 (21 Sep 2026). The user chose a ±10 °C attribution ("within 10 °C of the set-point
+is the heater, beyond it the sensor") and suggested a low-pass filter. Applied:
+
+- `temp_setpoint_tolerance_c = 10.0`: inside the steady-state window only, a row with
+  `|T − T_sp| > 10 °C` is attributed to the sensor and dropped from the achieved-mean diagnostic.
+  Not applied outside the window, where the warm-up transient is legitimately far from the
+  set-point.
+- `temp_plausible_c = (0, 160)`: absolute guard on the whole trace — below ambient or above the
+  150 °C safety limit plus margin cannot be the block, wherever it happens. A runaway toward the
+  limit is still shown, not masked.
+- Both counts, and the plateau standard deviation of the temperature signal, are surfaced at intake
+  and in the export (D3's principle).
+- **No low-pass filter.** The window mean already is one (cut-off ≈ 0.03 Hz for a ≥ 30 s window at
+  43 Hz), a linear filter would not change it measurably, §2.3 forbids modelling the temperature
+  signal, and a filter would hide from the hardware side exactly the noise D1 asks them to look at.
+  A display-only smoothing, if wanted, is a UI choice at M8 and changes no number.
+
+On the untuned sample file the ±10 °C rule drops 728 of 5,138 window rows (14 %) because the loop
+sat 5 °C below the set-point with 8 °C of noise on top; the window mean moves by 0.1 °C. After the
+retune (D2) the share should fall to a few percent; if it does not, the count is the D1 signal.
+
+*Reverses if:* the user wants the raw signal untouched, or a different tolerance.

@@ -37,18 +37,18 @@ not when the code is written.
 
 - [ ] **M2 — extraction + power**
   Algorithm 1; distinct-reading logic; equations (1)–(3); onset suggestion (Appendix A); power-log
-  alignment by offset; PM and PX sources.
+  alignment by offset; PM source only (PX removed, DECISIONS D9).
   *Accept (as written in §9.4, against `fred_experiment_test.csv`):* declared BREAKAGE, suggested
   onset 147.5 s, window [0, 142.5] s, `d̄ = 0.427` mm, `N = 193`, `ρ̂₁ ≈ 0.90`, `N_eff ≈ 10`, trend
-  warning true; PX heater power equals mean duty × `P_h,max` / 100; a synthetic power log with
-  known offset aligns to within 0.1 s.
+  warning true; a synthetic power log with known offset aligns to within 0.1 s.
   > **The fixture these numbers describe is not in hand.** The supplied
   > `fred_experiment_withgraphing.csv` is a format and schema reference only (see DECISIONS D2),
   > and contains no declared failure. The alignment sub-test can be met with synthetic fixtures
-  > now; the onset and statistics assertions need a real run with a declared breakage.
-  > **The PX acceptance line is pending removal** (DECISIONS D9, open item G2): the power log
-  > format is now specified in `docs/POWER_LOG_REQUIREMENTS.docx` with
-  > `data/examples/power_log_example.csv` as the fixture shape.
+  > now; the onset and statistics assertions need a real run with a declared breakage. The PX
+  > acceptance line of §9.4 is dropped (DECISIONS D9, confirmed). The power-log format is
+  > `docs/POWER_LOG_REQUIREMENTS.docx` with `data/examples/power_log_example.csv` as the fixture
+  > shape; the two temperature masks of DECISIONS D13 and the plateau-sd diagnostic are part of
+  > this milestone's extraction.
 
 - [ ] **M3 — simulate**
   `FakeFrED`: `d = d_in/√R · g(T)` with a mild temperature effect, `power = a + b·T + c·ω_s²`,
@@ -99,8 +99,8 @@ not when the code is written.
 
 - [ ] **M10 — Hardware bring-up** *(re-open when the power PCB arrives, §9.5)*
   Re-run the M2 fixture on a real power log, adjust the column mapping, validate the alignment.
-  > Under DECISIONS D9 (pending G2) the first campaign is PM/B, so M10 validates PM on real
-  > hardware rather than switching from PX; the B→A switch is a separate, later decision (G3).
+  > The first campaign is PM/B (DECISIONS D9, open items G2/G3 confirmed), so M10 validates PM
+  > on real hardware; the B→A switch is a separate, later decision.
 
 ---
 
@@ -115,10 +115,8 @@ Built now against the emulator only; flagged in `DECISIONS.md` until the power u
   thresholds and the monotonicity assumption are unverified until experiment M3b.
 - The alignment fallbacks (file timestamps, manual slide) must be fully working, not stubs — the
   PCB request list may be only partly granted.
-- The extruder constant `P_f,0` and the load dependence of heater power are unknown; PX values are
-  operator-entered placeholders and are flagged as such in the export.
-  > Pending removal with mode PX (DECISIONS D9, open item G2).
+- (Removed with mode PX, DECISIONS D9: there are no proxy constants any more.)
 
-Until then the first campaign runs **PX / mode B**, and the paper reports that.
+The first campaign runs **PM / mode B** (open items G2 and G3, confirmed 21 Sep 2026): the power PCB is a prerequisite, and the paper reports mode B with mode A parked.
 
 Full list of blocking measurements: `../../FrED_MOBO_Open_Items.docx`.
