@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Pins mirror environment.yml. The conda env is the developer path; CI installs the same
+      # versions with pip because it is faster and BoTorch is a pip install there either way
+      # (BoTorch stopped publishing to the pytorch conda channel after v0.12).
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.13.0 --index-url https://download.pytorch.org/whl/cpu
+          pip install \
+            botorch==0.18.1 \
+            gpytorch==1.15.2 \
+            linear_operator==0.6.1 \
+            numpy==2.5.1 \
+            pandas==3.0.5 \
+            scipy==1.18.0 \
+            matplotlib==3.11.1 \
+            pytest==9.1.1
+
+      - name: Report installed versions
+        run: |
+          python -c "import torch, botorch, gpytorch; print('torch', torch.__version__); print('botorch', botorch.__version__); print('gpytorch', gpytorch.__version__)"
+
+      - name: Run tests
+        run: pytest

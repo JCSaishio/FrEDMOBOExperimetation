@@ -1,0 +1,41 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+env/
+.conda/
+
+# Packaging / tooling
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Campaign output. The campaign folder (SQLite + config JSON + copied raw CSVs) is data, not
+# source, and can be large. §6.1: it is the single source of truth for a run and is kept with the
+# experiment, never in version control.
+results/
+campaigns/
+*.sqlite
+*.sqlite3
+*.db
+
+# Exports (§6.2) are regenerated from a campaign folder.
+campaign_export.json
+campaign_summary.md
+pareto_points.csv
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

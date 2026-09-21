@@ -1,0 +1,18 @@
+# Minimal packaging + pytest config. §9.3 does not list this file; see docs/DECISIONS.md D6 for
+# why it exists (tests import `fred_mobo`, which needs the package root on sys.path).
+# Dependencies are pinned in environment.yml, not here — the project is conda-first.
+
+[project]
+name = "fred-mobo"
+version = "0.0.0"
+description = "Constrained two-objective Bayesian optimization for the FrED fiber-extrusion testbed"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
