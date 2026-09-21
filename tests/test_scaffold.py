@@ -87,10 +87,30 @@ def test_reference_csv_is_present_and_has_the_device_schema() -> None:
     that the device column names and the separator/decimal convention are what extraction.py will
     be written against.
     """
-    csvs = list((ROOT / "data" / "examples").glob("*.csv"))
-    assert csvs, "no example CSV in data/examples/"
+    device = ROOT / "data" / "examples" / "fred_experiment_withgraphing.csv"
+    assert device.is_file(), "device example CSV missing from data/examples/"
 
-    header = csvs[0].read_text(encoding="utf-8-sig").splitlines()[0]
+    header = device.read_text(encoding="utf-8-sig").splitlines()[0]
     assert ";" in header, "device CSV is semicolon-separated (§2.3 step 1)"
     for column in ["Time (s)", "Temperature (C)", "Diameter raw (mm)", "Spooler setpoint (RPM)"]:
         assert column in header, f"expected device column {column!r} missing"
+
+
+def test_power_log_example_matches_the_requirements_file() -> None:
+    """data/examples/power_log_example.csv is the shape docs/POWER_LOG_REQUIREMENTS.docx specifies
+    (F1 dialect, F2 header names, F6 markers) and the shape PowerConfig defaults to. A glob-order
+    bug once made CI read this file as the device CSV — hence both files are named explicitly.
+    """
+    from fred_mobo.config import POWER_LOG_COLUMNS, default_2d_campaign
+
+    path = ROOT / "data" / "examples" / "power_log_example.csv"
+    assert path.is_file(), "power-log example CSV missing from data/examples/"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    power = default_2d_campaign().power
+    header = lines[0].split(power.separator)
+    assert header == list(POWER_LOG_COLUMNS.values()), "header must match the F2 names, in order"
+    events = [line.split(power.separator)[-1] for line in lines[1:]]
+    assert events.count(power.run_start_marker) == 1 and events.count(power.run_stop_marker) == 1
+    assert any(cell == "" for line in lines[1:] for cell in line.split(power.separator)[1:7]), (
+        "the example must show a missing sample as an empty cell (F7)"
+    )
