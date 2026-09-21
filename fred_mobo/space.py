@@ -9,8 +9,9 @@ switches to the rotated coordinates ``(log R, log v_f, T)``, whose rectangular r
 parallelogram expressed as linear inequality constraints passed to ``optimize_acqf`` (§7.4).
 
 STATUS: the coordinate map is complete. The draw ratio and the 3D rotated coordinates are NOT
-implemented — they are blocked on open item A3 (effective spool diameter under load). See
-``draw_ratio`` below and docs/PROGRESS.md.
+implemented — they are blocked on open item G1 (which variable the GP sees, now that the spool
+diameter is known to vary by a factor 2.2 over a campaign). See ``draw_ratio`` below and
+docs/PROGRESS.md.
 
 Implements: §1.1, §2.3 step 10 (draw ratio), §7.4 (rotated coordinates)
 Public interface (§7.1): ``to_unit``, ``from_unit``, ``bounds``, ``linear_constraints``
@@ -98,7 +99,7 @@ def _check(X: Tensor, config: CampaignConfig, name: str) -> Tensor:
 def draw_ratio(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201
     """Draw ratio ``R = v_s / v_f`` from set-points (§2.3 step 10).
 
-    NOT IMPLEMENTED — blocked on open item A3.
+    NOT IMPLEMENTED — blocked on open item G1 (A3 was answered on 21 Sep 2026).
 
     The formula itself is not in doubt::
 
@@ -106,31 +107,35 @@ def draw_ratio(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201
         v_f = l_f * omega_f             feed linear speed
         R   = v_s / v_f
 
-    What is in doubt is ``D_eff``. ``DeviceConfig.d_spool_mm`` is the *core* diameter, measured at
-    15 mm with a vernier. Using it gives ``R = 93.7`` at the reference run's set-points, hence
-    ``d_out = d_in / sqrt(R) = 0.72 mm`` for a 7 mm preform — against an observed plateau near
-    0.48 mm, which instead implies an effective diameter around 34 mm. Fibre accumulation is the
-    obvious candidate, but it has not been measured.
+    What A3 settled: ``DeviceConfig.d_spool_mm`` = 15 mm is the *bare core*; the wound diameter
+    reaches about 33 mm when full, over a 20 mm traverse. With the corrected ``l_f`` (A4) the
+    reference run's 0.48 mm plateau at 30 RPM implies ``D_eff ≈ 23 mm`` — a part-wound spool,
+    consistent with that range. So the physics reconciles.
 
-    Implementing this now would mean choosing between two values that disagree by a factor of 2.3
-    and then building the constraint model (§4), the iso-diameter inversion (§5.5) and the 3D
-    rotated coordinates (§7.4) on top of that guess. ``R`` is described in §4.1 as "the leading
-    quantity for the constraint", so a wrong choice propagates everywhere.
+    What it opened (G1): the spool gains ~2 mm per 180 s run and fills in ~9 runs, so at a fixed
+    ``omega_s`` the draw ratio varies from ``R = 136`` (bare core) to ``R = 300`` (full) — a
+    factor 2.2 inside one campaign. §4.2's "R is a known, exact function of the set-point" does
+    not hold on this device. Whether the GP input is ``omega_s`` (with the spool controlled) or
+    ``R`` (with the wound diameter entered per run and ``omega_s`` derived from it) decides the
+    signature of this function, the box this module normalises over, and what the acquisition
+    proposes. It is a change to the record's §1.1, so it is the user's call, not a default.
 
-    TODO(resume): implement once A3 lands. Needed: the wound-spool diameter under load, or a
-    decision to model accumulation explicitly. Then fill in ``tests/test_space.py::
+    TODO(resume): implement once G1 is answered in FrED_MOBO_Open_Items.docx. The kinematic core
+    takes ``d_eff_mm`` explicitly either way; hand value for the acceptance test: ``R = 136.4`` at
+    (30 RPM, 15 mm, 34.558 mm/rev, 0.30 RPM). Then fill in ``tests/test_space.py::
     test_draw_ratio_against_hand_calculation``, which is the M1 acceptance test.
     """
     raise NotImplementedError(
-        "draw_ratio is blocked on open item A3 (effective spool diameter under load). "
-        "See docs/PROGRESS.md and FrED_MOBO_Open_Items.docx item A3."
+        "draw_ratio is blocked on open item G1 (design variable omega_s vs R, and how the per-run "
+        "spool diameter is recorded); the device constants themselves landed with A3/A4. "
+        "See docs/PROGRESS.md and FrED_MOBO_Open_Items.docx item G1."
     )
 
 
 def linear_constraints(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201
     """Linear inequality constraints for the 3D rotated coordinates (§7.4).
 
-    NOT IMPLEMENTED — blocked on open item A3, transitively.
+    NOT IMPLEMENTED — blocked on open item G1, transitively.
 
     Going to 3D switches the coordinates to ``(log R, log v_f, T)``, in which the rectangular raw
     bounds become a parallelogram. That parallelogram is expressed to ``optimize_acqf`` through
@@ -142,6 +147,6 @@ def linear_constraints(*args, **kwargs):  # noqa: ANN002, ANN003, ANN201
     ``tests/test_space.py::test_3d_parallelogram_constraint``.
     """
     raise NotImplementedError(
-        "linear_constraints is blocked on open item A3, via draw_ratio. "
+        "linear_constraints is blocked on open item G1, via draw_ratio. "
         "Phase 2D does not need it: the box is rectangular and plain bounds suffice."
     )

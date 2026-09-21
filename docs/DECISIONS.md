@@ -103,3 +103,56 @@ pointer to `docs/ARCHITECTURE.pdf`. Per §9.3's spirit it claims **no results th
 produced**.
 
 *Reverses if:* the user wants the repo to carry no README until there is something to report.
+
+---
+
+### D8 — `ℓ_f = π·11 mm = 34.558 mm/rev`, replacing the record's 50.27 mm/rev
+
+The record (§1.1, §2.3) gives `ℓ_f = 50.27 mm/rev` "measured with a vernier" and hence
+`v_f = 15.1 mm/min` at `ω_f = 0.30 RPM`. The user corrected this on 21 Sep 2026 (open item A4):
+the extruder drive head is 11 mm in diameter, and under the no-slip assumption the advance per
+revolution is its circumference, `π·11 = 34.558 mm`. So `v_f = 10.37 mm/min`. Applied in
+`DeviceConfig.l_f_mm_per_rev`; every draw-ratio figure in the open-items document uses it.
+
+It is still a *calculated* value. Two checks are pending in A4: that 0.30 RPM is the head's own
+speed (after any gearbox), and that 11 mm is the gripping diameter rather than the outer diameter.
+The marked-preform advance over N revolutions would settle both, slip included.
+
+*Reverses if:* that measurement disagrees with 34.56 mm/rev by more than a few percent.
+
+---
+
+### D9 — Mode PX is removed; mode PM is the only power source *(pending confirmation, open item G2)*
+
+§2.4 builds both sources and records which one each run used; §9.5 says the first campaign runs in
+PX/B. On 21 Sep 2026 the user answered B5: "don't do the proxy anymore, just the measured power",
+and B1: the PCB will "most likely" exist at campaign start. Consequences: B2, B3, B4 (every PX
+constant) are closed as moot; the `PowerConfig` PX fields and `is_complete()` will be removed
+rather than left as dead paths; the emulator writes one power-log format — the one specified in
+`docs/POWER_LOG_REQUIREMENTS.docx` — which is also what the intake is tested against.
+
+The risk is stated in the open-items document (G2): if the PCB is late, `f₂` cannot be computed
+and the campaign cannot start; there is no bridge. This contradicts the record, so it is **not
+applied to code until the user confirms G2**. The config still accepts `source = "PX"` today.
+
+*Reverses if:* the user does not confirm G2, or the PCB slips past the retuned device.
+
+---
+
+### D10 — Spool geometry from A3 recorded; the draw ratio waits for G1, not for a measurement
+
+A3 (21 Sep 2026): the spool core is 15 mm bare; fully wound it is about 33 mm, over a 20 mm
+reciprocating traverse; "an estimate for now". With D8, the reference run's 0.48 mm plateau at
+30 RPM implies `D_eff ≈ 23 mm` — inside that range, so the physics reconciles.
+
+But the same kinematics say the fill is first-order: at 30 RPM, `R = 136` on the bare core and
+`R = 300` when full, and a 180 s run adds ~2 mm of diameter (90 turns, ~42 turns per layer,
+~2 layers), so the spool fills in ~9 runs. §4.2's "R is a known, exact function of the set-point
+ω_s" therefore does not hold on this device. Whether the GP input is `ω_s` (spool controlled) or
+`R` (wound diameter entered per run, `ω_s` derived from it) is a change to §1.1 and is put to the
+user as open item G1 with a recommendation (R). `space.draw_ratio` and `linear_constraints` stay
+`NotImplementedError`, now naming G1. `DeviceConfig.d_spool_mm` keeps its meaning as the bare
+core; the full diameter and traverse are recorded here rather than in config until G1 decides
+whether they are constants or per-run inputs.
+
+*Reverses if:* G1 is answered — then this becomes an implementation, not a decision.

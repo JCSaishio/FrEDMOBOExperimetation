@@ -44,8 +44,11 @@ not when the code is written.
   known offset aligns to within 0.1 s.
   > **The fixture these numbers describe is not in hand.** The supplied
   > `fred_experiment_withgraphing.csv` is a format and schema reference only (see DECISIONS D2),
-  > and contains no declared failure. The alignment and PX sub-tests can be met with synthetic
-  > fixtures now; the onset and statistics assertions need a real run with a declared breakage.
+  > and contains no declared failure. The alignment sub-test can be met with synthetic fixtures
+  > now; the onset and statistics assertions need a real run with a declared breakage.
+  > **The PX acceptance line is pending removal** (DECISIONS D9, open item G2): the power log
+  > format is now specified in `docs/POWER_LOG_REQUIREMENTS.docx` with
+  > `data/examples/power_log_example.csv` as the fixture shape.
 
 - [ ] **M3 — simulate**
   `FakeFrED`: `d = d_in/√R · g(T)` with a mild temperature effect, `power = a + b·T + c·ω_s²`,
@@ -95,8 +98,9 @@ not when the code is written.
   instructions; final pass over `docs/`.
 
 - [ ] **M10 — Hardware bring-up** *(re-open when the power PCB arrives, §9.5)*
-  Re-run the M2 fixture on a real power log, adjust the column mapping, validate the alignment,
-  and switch the campaign config from PX/B to PM/A only if the operator confirms.
+  Re-run the M2 fixture on a real power log, adjust the column mapping, validate the alignment.
+  > Under DECISIONS D9 (pending G2) the first campaign is PM/B, so M10 validates PM on real
+  > hardware rather than switching from PX; the B→A switch is a separate, later decision (G3).
 
 ---
 
@@ -113,6 +117,7 @@ Built now against the emulator only; flagged in `DECISIONS.md` until the power u
   PCB request list may be only partly granted.
 - The extruder constant `P_f,0` and the load dependence of heater power are unknown; PX values are
   operator-entered placeholders and are flagged as such in the export.
+  > Pending removal with mode PX (DECISIONS D9, open item G2).
 
 Until then the first campaign runs **PX / mode B**, and the paper reports that.
 

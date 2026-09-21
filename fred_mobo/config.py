@@ -216,18 +216,23 @@ class StoppingConfig:
 
 @dataclass(frozen=True)
 class DeviceConfig:
-    """Measured device constants (§1.1).
+    """Measured device constants (§1.1), as answered in the open-items document on 21 Sep 2026.
 
-    ``d_spool_mm`` is the *core* diameter measured with a vernier. The effective diameter grows
-    as fibre accumulates, and open item A3 records that the two have not been reconciled: the
-    observed drawdown on the reference run implies an effective diameter well above the core.
-    Until A3 is resolved, nothing in this package computes a draw ratio from these values.
+    ``d_spool_mm`` is the *bare core* diameter (open item A3). The wound diameter grows to about
+    33 mm when full and the spool fills in roughly nine runs, so R at a fixed set-point varies by
+    a factor 2.2 over a campaign. Which variable the GP sees, and how the per-run diameter is
+    recorded, is open item G1; until it is decided nothing in this package computes a draw ratio
+    from these values (DECISIONS D10).
 
-    ``d_in_mm`` is PROVISIONAL (open item A1) and is used only by the emulator at M3.
+    ``l_f_mm_per_rev`` is the circumference of the 11 mm extruder drive head, π·11 = 34.558 mm,
+    under the no-slip assumption (A4; DECISIONS D8). It replaces the 50.27 mm/rev of the record.
+    So ``v_f = l_f · omega_f = 10.37 mm/min`` at 0.30 RPM, not the 15.1 mm/min written in §2.3.
+
+    ``d_in_mm`` = 7 mm is confirmed (A1) and is used by the emulator at M3.
     """
 
     d_spool_mm: float = 15.0
-    l_f_mm_per_rev: float = 50.27
+    l_f_mm_per_rev: float = 34.558
     omega_f_rpm: float = 0.30
     d_in_mm: float = 7.0
 

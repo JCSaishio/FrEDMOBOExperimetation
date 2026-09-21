@@ -2,7 +2,8 @@
 
 raw <-> unit-cube round-trip is complete. The R hand calculation and the 3D parallelogram
 constraint are NOT tested here beyond asserting that they refuse to run: both are blocked on open
-item A3 (effective spool diameter under load), so there is no known-good value to assert against.
+item G1 (design variable omega_s vs R now that the spool diameter is known to vary by a factor
+2.2 over a campaign), so the function's signature is not yet fixed.
 See ``fred_mobo.space.draw_ratio`` and docs/PROGRESS.md.
 """
 
@@ -115,32 +116,34 @@ def test_preserves_double_precision(config: CampaignConfig) -> None:
     assert bounds(config).dtype is DTYPE
 
 
-# ------------------------------------------------------------------ blocked on open item A3
+# ------------------------------------------------------------------ blocked on open item G1
 
 
 def test_draw_ratio_is_blocked_not_guessed() -> None:
     """Deliberate: R is 'the leading quantity for the constraint' (§4.1).
 
-    The core diameter (15 mm) and the diameter the observed drawdown implies (~34 mm) disagree by
-    a factor of 2.3. Guessing would propagate into the constraint model, the iso-diameter
-    inversion and the 3D coordinates. This test exists so the block is visible in the suite rather
-    than silently absent.
+    A3 (21 Sep 2026) settled the spool geometry: 15 mm bare core, ~33 mm full, filling in ~9 runs,
+    so R at a fixed set-point varies by a factor 2.2 inside a campaign. Whether the GP input is
+    omega_s or R (open item G1) fixes this function's signature and the box; implementing it before
+    that is decided would bake a §1.1 change into the code without the user's say. This test exists
+    so the block is visible in the suite rather than silently absent.
     """
-    with pytest.raises(NotImplementedError, match="A3"):
+    with pytest.raises(NotImplementedError, match="G1"):
         draw_ratio()
 
 
 def test_linear_constraints_are_blocked_transitively() -> None:
-    with pytest.raises(NotImplementedError, match="A3"):
+    with pytest.raises(NotImplementedError, match="G1"):
         linear_constraints()
 
 
-@pytest.mark.xfail(reason="blocked on open item A3: effective spool diameter under load", strict=True)
+@pytest.mark.xfail(reason="blocked on open item G1: design variable omega_s vs R", strict=True)
 def test_draw_ratio_against_hand_calculation() -> None:
-    """The M1 acceptance test, parked until A3 lands.
+    """The M1 acceptance test, parked until G1 is answered.
 
-    TODO(resume): with D_eff resolved, assert R against the hand calculation
-    ``R = pi * D_eff * omega_s / (l_f * omega_f)`` at a set-point computed by hand, then delete
-    the xfail mark and tick M1 in docs/PLAN.md.
+    TODO(resume): assert R against the hand calculation
+    ``R = pi * D_eff * omega_s / (l_f * omega_f)``. Hand value with the answered constants:
+    ``R = pi * 15 * 30 / (34.558 * 0.30) = 136.4`` on the bare core at 30 RPM. Then delete the
+    xfail mark and tick M1 in docs/PLAN.md.
     """
     raise NotImplementedError
