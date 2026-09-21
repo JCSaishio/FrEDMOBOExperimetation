@@ -42,7 +42,7 @@ table row; sentinel `[ type your reply here ]`. What the Rev. 3 replies changed 
 | G3 | Yes | mode A parked; PLAN M10 |
 | G1 | prefers `ω_s`; asks for more options | re-opened with options A/A+/B/C/D; nothing in code |
 
-`pytest`: 83 passed, 1 xfailed.
+`pytest`: 84 passed, 1 xfailed (`6c4b8e2` fixed a Linux glob-order failure in `test_scaffold.py` and added a shape test for `power_log_example.csv`; CI green).
 
 ---
 
