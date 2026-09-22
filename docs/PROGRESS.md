@@ -24,14 +24,17 @@ or B the signature is the same kinematic core with a different `d_eff_mm` source
 per-run fields (`d_start_mm`, `d_end_mm`, wound width, micrometer readings) come before M3, so the
 calibration runs go straight into the database.
 
-**Open-items state (Rev. 4, 21 Sep 2026).** 33 items; three yellow REPLY rows await the user:
-**A2** (upper bound of the temperature box), **G1** (spool protocol and variable), **H1**
-(calibration runs). Read them back with `REPLY ([A-H]\d+):\s*(.*)` on the first cell of every
+**Open-items state (Rev. 4, answered 22 Sep 2026).** 33 items. **A2 is closed** — the user widened
+the box to `[90, 130]` °C, applied below. **G1 is answered but not settled**: the reply proposes
+modelling the fill rather than picking A / A+ / B, and its premise (“the amount of fiber in the
+spool is determined by the spooling speed”) is contradicted by the reply’s own model — integrating
+it gives `D_end² − D_start² = 4·d_in²·v_f·t/(π·w) = 97.02 mm²`, with no `ω_s` in it, so the fill is
+speed-independent and a Rev. 5 question goes back. **H1 is still blank.** Read them back with `REPLY ([A-H]\d+):\s*(.*)` on the first cell of every
 table row; sentinel `[ type your reply here ]`. What the Rev. 3 replies changed in code:
 
 | Item | Reply | Applied to |
 |---|---|---|
-| A2 | EVA; draws from 90 °C; 150 °C safety limit | `default_2d_campaign` box `[90, 120]` (upper provisional); D11 |
+| A2 | EVA; draws from 90 °C; 150 °C safety limit; **upper bound widened to 130** (22 Sep) | `default_2d_campaign` box `[90, 130]`; D11 rewritten as settled; `test_space` corners and midpoint follow |
 | A3 | facts confirmed; spool emptied between runs; sample sensor uncalibrated | D10 amended; the 23 mm inference withdrawn |
 | A4 | no gearbox; 11 mm is the head's outer diameter | `l_f` kept at 34.558 as an **upper bound**; H1 measures it |
 | E1 | 0.25 mm has been made "depending on temp"; keep ≈ 0.40 | `d_star_mm = 0.40`; sessions 2–3 provisionally 0.30 / 0.50 after H1 |
@@ -113,8 +116,11 @@ suite rather than silently absent, and carries the parked acceptance test as
 - Git identity is set **repo-locally** (DECISIONS D5) to the GitHub noreply address, so the
   institutional email is not published in the history of a public repo. Say so if a different
   authorship is wanted — the history is one commit deep and can still be rewritten cheaply.
-- 33 open items are tracked in `../../FrED_MOBO_Open_Items.docx` (Rev. 4). **G1** (spool
-  protocol and design variable) gates M1; **H1** (calibration runs) decides `ω_f`, the session
-  targets and whether `l_f`'s bound needs replacing; **A2** is one number (the box's upper bound).
+- 33 open items are tracked in `../../FrED_MOBO_Open_Items.docx`. **G1** (spool protocol and
+  design variable) still gates M1 — answered 22 Sep but with a proposal rather than a choice, so
+  Rev. 5 asks one sharper question; **H1** (calibration runs) is unanswered and decides `ω_f`, the
+  session targets and whether `l_f`’s bound needs replacing. **A2 is closed at [90, 130] °C.**
+- The 22 Sep replies were read out of Word’s AutoRecovery snapshot because the `.docx` on disk was
+  still unsaved. **Re-verify A2/G1 against the saved file before Rev. 5 is built.**
 - The repo has no licence yet (`README.md` says so). It is public, so this is worth deciding
   before there is anything in it worth copying.

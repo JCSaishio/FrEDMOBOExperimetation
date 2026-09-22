@@ -37,7 +37,7 @@ def test_bounds_shape_and_order(config: CampaignConfig) -> None:
     assert b.shape == (2, config.d)
     assert b.dtype is DTYPE
     torch.testing.assert_close(b[0], torch.tensor([90.0, 25.0], dtype=DTYPE))
-    torch.testing.assert_close(b[1], torch.tensor([120.0, 50.0], dtype=DTYPE))
+    torch.testing.assert_close(b[1], torch.tensor([130.0, 50.0], dtype=DTYPE))
 
 
 def test_bounds_columns_follow_variable_order(config: CampaignConfig) -> None:
@@ -58,19 +58,19 @@ def test_unit_bounds_is_the_unit_cube(config: CampaignConfig) -> None:
 
 
 def test_corners_map_to_cube_corners(config: CampaignConfig) -> None:
-    raw = torch.tensor([[90.0, 25.0], [120.0, 50.0]], dtype=DTYPE)
+    raw = torch.tensor([[90.0, 25.0], [130.0, 50.0]], dtype=DTYPE)
     torch.testing.assert_close(
         to_unit(raw, config), torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=DTYPE)
     )
 
 
 def test_midpoint_maps_to_centre(config: CampaignConfig) -> None:
-    raw = torch.tensor([[105.0, 37.5]], dtype=DTYPE)
+    raw = torch.tensor([[110.0, 37.5]], dtype=DTYPE)
     torch.testing.assert_close(to_unit(raw, config), torch.tensor([[0.5, 0.5]], dtype=DTYPE))
 
 
 def test_round_trip_raw_to_unit_to_raw(config: CampaignConfig) -> None:
-    raw = torch.tensor([[90.0, 25.0], [105.0, 37.5], [120.0, 50.0], [112.3, 31.7]], dtype=DTYPE)
+    raw = torch.tensor([[90.0, 25.0], [105.0, 37.5], [130.0, 50.0], [112.3, 31.7]], dtype=DTYPE)
     torch.testing.assert_close(from_unit(to_unit(raw, config), config), raw)
 
 
@@ -96,7 +96,7 @@ def test_map_is_dimension_agnostic() -> None:
         constraint=base.constraint,
         extraction=base.extraction,
     )
-    raw = torch.tensor([[90.0, 25.0, 10.0], [120.0, 50.0, 30.0]], dtype=DTYPE)
+    raw = torch.tensor([[90.0, 25.0, 10.0], [130.0, 50.0, 30.0]], dtype=DTYPE)
     torch.testing.assert_close(
         to_unit(raw, three_d), torch.tensor([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]], dtype=DTYPE)
     )

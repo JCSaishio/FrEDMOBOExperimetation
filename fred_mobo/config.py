@@ -514,9 +514,9 @@ def load(path: str | Path) -> CampaignConfig:
 def default_2d_campaign(d_star_mm: float = 0.40) -> CampaignConfig:
     """The phase-2D campaign of §1.1, with the defaults as they stand after the 21 Sep 2026 answers.
 
-    Temperature box [90, 120] °C, not the record's [70, 100]: the EVA feedstock does not draw
-    below 90 °C and the machine's safety limit is 150 °C (open item A2; DECISIONS D11). The upper
-    bound is provisional — the user has been asked to confirm it.
+    Temperature box [90, 130] °C, not the record's [70, 100]: the EVA feedstock does not draw
+    below 90 °C and the machine's safety limit is 150 °C (open item A2; DECISIONS D11). The user
+    widened the upper bound from the provisional 120 °C to 130 °C in the Rev. 5 reply.
 
     The power objective's reference point, ideal and nadir are placeholders: §5.1 freezes the
     power side at 'worst pilot value + 10 %' after the first PM pilot, which has not been run.
@@ -525,7 +525,7 @@ def default_2d_campaign(d_star_mm: float = 0.40) -> CampaignConfig:
     band_lo, band_hi = ExtractionConfig(d_star_mm=d_star_mm).diameter_band()
     return CampaignConfig(
         variables=[
-            Variable("T", "heater temperature set-point", "degC", 90.0, 120.0),
+            Variable("T", "heater temperature set-point", "degC", 90.0, 130.0),
             Variable("omega_s", "spooler speed set-point", "RPM", 25.0, 50.0),
         ],
         objectives=[

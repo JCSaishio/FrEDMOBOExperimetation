@@ -263,10 +263,10 @@ def test_temperature_masks_carry_the_e5_answers() -> None:
 
 
 def test_default_box_and_target_follow_the_answers() -> None:
-    """A2: EVA draws from 90 °C, safety limit 150 °C → box [90, 120] (upper provisional). E1: d* = 0.40."""
+    """A2: EVA draws from 90 °C, safety limit 150 °C → box [90, 130] (upper confirmed, Rev. 5). E1: d* = 0.40."""
     config = default_2d_campaign()
     temp = next(v for v in config.variables if v.name == "T")
-    assert (temp.lower, temp.upper) == (90.0, 120.0)
+    assert (temp.lower, temp.upper) == (90.0, 130.0)
     assert config.extraction.d_star_mm == pytest.approx(0.40)
     assert config.constraint.delta_t_c == pytest.approx(1.0)
 

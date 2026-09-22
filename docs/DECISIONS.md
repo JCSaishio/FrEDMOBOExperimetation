@@ -176,16 +176,28 @@ fill per run before anything is built on the kinematic table.
 
 ---
 
-### D11 — Temperature box `[90, 120] °C`, replacing the record's `[70, 100]`
+### D11 — Temperature box `[90, 130] °C`, replacing the record's `[70, 100]`
 
 Open item A2 (21 Sep 2026): the feedstock is EVA hot-melt; it draws at 90 °C and not below; the
 machine's safety limit is 150 °C. A box starting at 70 °C would spend most of the Sobol design
-where nothing extrudes. The lower bound is the user's. The upper bound, 120 °C, is a proposal:
-it keeps the record's 30 °C span and stays 30 °C under the safety limit; the user has been asked
-to confirm or widen it (A2 reply row). Applied in `default_2d_campaign`; the emulator's `g(T)`
-will have no flow below 90 °C.
+where nothing extrudes. The lower bound is the user's.
 
-*Reverses if:* the user sets a different upper bound — a one-line change.
+The upper bound was provisionally 120 °C (my proposal: the record's 30 °C span, 30 °C under the
+safety limit). **Settled at 130 °C on 22 Sep 2026** by the A2 reply: *“I think wider could be
+better although I am sure that at a certain temp the fiber will flow tool quickly for the motor
+to handle so this 130 is fine.”* So the box is `[90, 130]` — a 40 °C span, still 20 °C under the
+safety limit, with the E5 absolute guard at 160 °C unchanged so a runaway is still shown rather
+than masked. Applied in `default_2d_campaign`; the emulator's `g(T)` will have no flow below
+90 °C.
+
+The user's own caveat — that above some temperature the melt flows faster than the spooler can
+take up — is a *feasibility* statement, not a box statement: it is what the mode-B constraint
+model is for. Runs at the hot end that break are declared failures at intake and teach the
+classifier where the ceiling is; §4 does not need the box to exclude them in advance, and
+narrowing the box to avoid them would hide the boundary the campaign is supposed to find.
+
+*Reverses if:* the hot end turns out to break so often that the Sobol design wastes runs — then
+the upper bound comes down and the reason is recorded here.
 
 ---
 
