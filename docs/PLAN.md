@@ -21,19 +21,23 @@ not when the code is written.
   **Partially complete — 1 of 3 acceptance tests met.**
   - [x] JSON round-trip — `tests/test_config.py`, 29 tests.
   - [x] *(beyond the stated criterion)* raw ↔ unit-cube map — `tests/test_space.py`, 13 tests.
-  - [ ] `R` against hand calculation — **blocked on open item A3**.
-  - [ ] 3D parallelogram constraint — **blocked on A3, transitively**.
+  - [ ] `R` against hand calculation — **blocked on open item G1**.
+  - [ ] 3D parallelogram constraint — **blocked on G1, transitively**.
 
-  > Only **A3** blocks this milestone, not A1. `d_in` enters `d_out = d_in/√R`, which lives in
-  > the emulator at M3; `R` itself needs the *effective* spool diameter, which is A3. The core
-  > diameter (15 mm) and the value the observed drawdown implies (~34 mm) disagree by 2.3×, and
-  > §4.1 calls `R` "the leading quantity for the constraint", so guessing would propagate into
-  > the constraint model, the iso-diameter inversion and the 3D coordinates.
+  > **A3 is answered and no longer blocks this** (15 mm bare core, ~33 mm full, 20 mm traverse,
+  > spool emptied between runs). What blocks it now is **G1**, and the block has changed shape:
+  > the quantity is no longer a missing constant but a missing *decision*. DECISIONS D14 settles
+  > the physics — `D_end² − D_start² = 4·d_in²·v_f·t/(π·w) = 97.02 mm²` per 180 s run, independent
+  > of `ω_s`, so `R` is a function of time within a run, `R(t) = π·D(t)·ω_s / v_f` — but the user
+  > has asked G1 to stay open while we settle how the spool state enters the design point, and
+  > which sleeve-free lever puts `d* = 0.40 mm` inside the box (it is not reachable on a bare core
+  > at `ω_f = 0.30`: run-mean `d ∈ [0.4429, 0.6264]` mm over `ω_s ∈ [25, 50]`).
   >
-  > `space.draw_ratio` and `space.linear_constraints` therefore raise `NotImplementedError`
-  > naming A3, rather than being written against a guessed constant. The acceptance test
+  > `space.draw_ratio` and `space.linear_constraints` therefore still raise `NotImplementedError`,
+  > naming G1, rather than being written against a signature that is about to change: a constant
+  > `R` and a `R(t)` path do not have the same return type. The acceptance test
   > `test_draw_ratio_against_hand_calculation` is `xfail(strict=True)`, so it will fail loudly
-  > the moment the value lands and the implementation appears.
+  > the moment the decision lands and the implementation appears.
 
 - [ ] **M2 — extraction + power**
   Algorithm 1; distinct-reading logic; equations (1)–(3); onset suggestion (Appendix A); power-log
@@ -50,11 +54,23 @@ not when the code is written.
   > shape; the two temperature masks of DECISIONS D13 and the plateau-sd diagnostic are part of
   > this milestone's extraction.
 
+- [ ] **M2b — per-run spool fields at intake** *(new, ahead of M3; open item H1 accepted)*
+  The operator records `d_start_mm` and `d_end_mm` (vernier on the spool), the wound width, and
+  the micrometer reading on the fibre, alongside the CSV upload. Stored per run and exported.
+  *Accept:* a run whose measured `D_end` departs from the D14 prediction is flagged at intake,
+  with the deviation and the recomputed `R̄` surfaced, not silently accepted.
+  > H1 was accepted on 22 Sep 2026 and will be run **on a full spool** (DECISIONS D15), so these
+  > fields have to exist before the calibration runs happen or their data cannot be entered. This
+  > is the only piece of the H1 work that is software; the rest is bench time.
+
 - [ ] **M3 — simulate**
   `FakeFrED`: `d = d_in/√R · g(T)` with a mild temperature effect, `power = a + b·T + c·ω_s²`,
   breakage above `R_hi(T)` and overflow below `R_lo(T)`, Gaussian run-to-run noise; writes device
   CSVs in the real schema (and optional power logs).
   *Accept:* generated files pass M2 extraction; failure regions match their definitions.
+  > The emulator integrates the D14 spool path, so `d` drifts within a run exactly as the device's
+  > does (−8.6 % on a bare core, −2.1 % from a full one). Writing it with a constant `R` would
+  > produce fixtures that the trend check never fires on, and hide the problem M2 has to handle.
 
 - [ ] **M4 — models**
   Algorithm 2; kernel choice; `FitReport` with hyperparameters, LML, the LML grid over (ℓ₁, ℓ₂),
@@ -118,5 +134,15 @@ Built now against the emulator only; flagged in `DECISIONS.md` until the power u
 - (Removed with mode PX, DECISIONS D9: there are no proxy constants any more.)
 
 The first campaign runs **PM / mode B** (open items G2 and G3, confirmed 21 Sep 2026): the power PCB is a prerequisite, and the paper reports mode B with mode A parked.
+
+## Bench work the plan now depends on
+
+- **H1 — pre-campaign calibration runs. Accepted 22 Sep 2026, not yet run.** Empty-or-full spool
+  (the user says full), `ω_f = 0.30`, `ω_s = 25 / 37.5 / 50`, micrometer on the fibre, vernier on
+  the spool before and after. Measures the effective `ℓ_f` (D8/A4 leave it as an upper bound), the
+  vision-minus-micrometer offset, the fill per run against D14, and the direction of the
+  temperature effect. **It gates G1**, because no sleeve-free lever can be sized until `ℓ_f` is
+  measured: a 15 % error in `ℓ_f` moves `d` by 7.8 %.
+- **D2 — heater retune.** Still outstanding; the sample file sat ~5 °C below set-point.
 
 Full list of blocking measurements: `../../FrED_MOBO_Open_Items.docx`.

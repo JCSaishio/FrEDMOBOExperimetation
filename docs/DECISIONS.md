@@ -172,6 +172,29 @@ the sample file is **withdrawn** — the user states its sensor was uncalibrated
 calibration runs with a micrometer) is proposed to measure `d(ω_s)`, the effective `ℓ_f` and the
 fill per run before anything is built on the kinematic table.
 
+**Amended again after the saved Rev. 5 reply (22 Sep 2026).** The user answered G1 with a
+*model* rather than a choice, and asked for the item to stay open:
+
+> "…the amount of fiber in the spool is determined by the spooling speed, so I think that A would
+> be okay but we could make a calculation about how much the spool has filled up using the spool
+> speed and the amount of time elapsed and the average diameter of the fiber. For every revolution
+> we can assume that the diameter in the spooled section increases by twice the average diameter
+> of the fiber and that it will take the full length of the spool divided by the diameter
+> revolutions to fill up the spool and update the tangential speed that the fiber experiences so
+> what we should really standardize is the final dimeter of the spool after a run and this can be
+> roughly estimated using mass conservation. Then the user can measure the spool and record the
+> final height and I suppose that a correction could be made there although I will still need you
+> to keep this item open so that we can discuss how this transfers to the points. So keep these
+> items open and lets discuss how to expand A without the printed sleeve."
+
+Their layer model **is** the square-packing model this decision already used, so it confirms the
+arithmetic rather than replacing it; it is now written down properly as **D14**, together with the
+finding that their stated premise — that the fill depends on the spooling speed — does not survive
+their own equations. **A+ (the printed sleeve) is withdrawn**, at the user's instruction. G1
+therefore stays **open**, narrowed to one question (how the spool state enters the design point,
+and which sleeve-free lever puts `d* = 0.40 mm` inside the box), carried into Rev. 5 of the
+open-items document.
+
 *Reverses if:* G1 is answered — then this becomes an implementation, not a decision.
 
 ---
@@ -244,3 +267,85 @@ sat 5 °C below the set-point with 8 °C of noise on top; the window mean moves 
 retune (D2) the share should fall to a few percent; if it does not, the count is the D1 signal.
 
 *Reverses if:* the user wants the raw signal untouched, or a different tolerance.
+
+---
+
+### D14 — The spool-fill law, and `R` becomes `R(t)`
+
+Settled by the Rev. 5 reply to G1 (22 Sep 2026). The user's winding model — one layer is `w/d`
+turns laid side by side across the traverse, completing a layer raises the diameter by `2·d`, and
+the fibre's tangential speed follows the growing `D` — is square packing of round turns, i.e. the
+`π/4` already implicit in D10's `ΔD = 48.5/D`. It is adopted as the emulator's and the extractor's
+model of the spool.
+
+Integrating it forward in time (`scripts` not required; scratchpad `physics_g1_rev5.py`, forward
+Euler at 10 ms, with no cancellation assumed):
+
+```
+dD/dt = ω_s · 2·d²/w        and        d = d_in·√(v_f / (π·D·ω_s))
+⇒ dD/dt = 2·d_in²·v_f / (π·D·w)         — ω_s cancels
+⇒ D_end² − D_start² = 4·d_in²·v_f·t / (π·w) = 97.02 mm²  for a 180 s run at ω_f = 0.30
+```
+
+| `D₀` | `ω_s` | `D_end` | `ΔD` | `d` start → end | drift |
+|---|---|---|---|---|---|
+| 15 mm | 25 RPM | 17.9449 mm | 2.9449 mm | 0.6567 → 0.6004 mm | −8.6 % |
+| 15 mm | 30 RPM | 17.9449 mm | 2.9449 mm | 0.5994 → 0.5481 mm | −8.6 % |
+| 15 mm | 37.5 RPM | 17.9449 mm | 2.9449 mm | 0.5362 → 0.4902 mm | −8.6 % |
+| 15 mm | 50 RPM | 17.9449 mm | 2.9449 mm | 0.4643 → 0.4245 mm | −8.6 % |
+
+Three consequences, all recorded here so they are not re-derived:
+
+1. **The fill is set-point independent.** Spinning faster draws a proportionally thinner fibre, so
+   the *volume* laid down per second is fixed by the extruder alone. The user's premise that "the
+   amount of fiber in the spool is determined by the spooling speed" is the one part of the reply
+   that does not hold — and it is good news, because their stated goal, *standardising the final
+   spool diameter*, is then delivered for free by the protocol they already follow: empty the
+   spool, keep the run length fixed, and `D_end = 17.9449 mm` on every run at every set-point.
+2. **`R` is a function of time within a run, not a constant.** `R(t) = π·D(t)·ω_s / v_f`, so
+   `space.draw_ratio` must expose the `D`-path, and `f₁`'s window mean is a mean over a drifting
+   `d`. On the bare core that drift is 0.0514 mm across a run — **9.7 steps of the 5.3 µm vision
+   lattice (D3)** — a clean monotone ramp, which is the signature Appendix A's trend check exists
+   to catch. Left alone it would flag a large share of runs as non-steady.
+3. **`D_start` and `D_end` are recorded per run, as a check, not as a GP input.** The user asked
+   for the operator to "measure the spool and record the final height". Under the emptied-spool
+   protocol the `D`-path is *deterministic and identical* for every run, so the spool state does
+   not vary between design points and `ω_s` remains the coordinate; the vernier reading's job is
+   to confirm the protocol held. A run whose measured `D_end` departs from 17.9449 mm is flagged,
+   and its `R̄` recomputed from the measured path. This is the beginning of an answer to the user's
+   "how this transfers to the points", and the rest is G1.
+
+*Reverses if:* the protocol stops emptying the spool between runs — then `D_start` becomes a real
+per-run covariate and the errors-in-variables problem the user is pointing at becomes live.
+
+---
+
+### D15 — H1 accepted, but it will be run on a *full* spool
+
+The Rev. 5 reply to H1 (22 Sep 2026) accepts the calibration runs: *"I'll run those as soon as I
+can with the full spool and vision system updated and Ii will also try to have the diameter as
+constant as possible here."* Recorded, with three notes.
+
+**A full spool cannot be the campaign protocol, only a calibration condition.** Pre-winding a bare
+15 mm core to 33 mm costs 9 runs' worth of fibre; and a campaign *starting* at 33 mm would reach
+`√(33² + 6·97.02) = 40.9 mm` after the Sobol block alone and 60.1 mm after 26 runs, against a
+stated capacity of 33 mm. So the campaign still runs from the emptied core, and H1's numbers will
+be taken at a spool state the campaign never sees.
+
+**That does not spoil H1**, because what H1 is for is the constants, not the operating point: with
+`D_start` and `D_end` on the vernier and a micrometer on the fibre, `ℓ_f` follows from mass
+conservation at *any* `D`, as does the vision-minus-micrometer offset and the direction of the
+temperature effect. It does mean the runs must record `D_start` and `D_end`, not just `ω_s` — the
+intake fields below.
+
+**What H1 will show on a full spool**, on today's constants, so the user can sanity-check the rig
+before trusting it: `ω_s = 25 / 37.5 / 50 RPM → d = 0.4427 / 0.3615 / 0.3130 mm` at the start of
+the run, with `d* = 0.40 mm` landing at `ω_s ≈ 30 RPM`. If the micrometer disagrees with these by
+more than a few percent, `ℓ_f` is the constant at fault (D8, A4) — which is the whole point.
+
+Their added intention, "have the diameter as constant as possible", is exactly the within-run
+drift of D14: on a full spool it is −2.1 % rather than the bare core's −8.6 %, so this condition
+will look better behaved than the campaign will.
+
+*Reverses if:* the calibration is run on the bare core after all — the analysis is the same, the
+recorded `D_start` simply differs.

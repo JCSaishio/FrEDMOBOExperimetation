@@ -7,34 +7,56 @@ always say exactly where to resume.
 
 ## Where to resume
 
-**Next step: M3's I/O layer — the device-CSV writer *and* the power-log writer — in `simulate.py`.**
-Neither depends on an open item. The power-log format is fixed by
-`docs/POWER_LOG_REQUIREMENTS.docx` (F1–F10) and `PowerConfig`'s defaults; the device-CSV format is
-`data/examples/fred_experiment_withgraphing.csv` (`;`, decimal comma, ~43 Hz log against ~3 Hz
-sample-and-hold vision, 5.3 µm lattice). Together they are every fixture M2's extraction and
-alignment tests need. The drawdown relation itself stays behind G1.
+**Next step: M2b — the per-run spool fields at intake** (`d_start_mm`, `d_end_mm`, wound width,
+micrometer reading), then M3's I/O layer in `simulate.py`. M2b moved ahead of M3 because open item
+**H1 was accepted on 22 Sep 2026** and will be run on a full spool (DECISIONS D15): the fields have
+to exist before the calibration runs happen, or their data cannot be entered. Neither depends on a
+pending answer.
 
-**If G1 is answered first, do M1 instead.** The user's Rev. 3 reply prefers `ω_s`; the Rev. 4
-recommendation is option A (keep `ω_s`, "empty the spool before every run, same run length",
-`R` from the set-point through `D_mid = D_core + ΔD/2` with `ΔD = 48.5/D` mm per 180 s run — or,
-better, from the logged turns at the window midpoint). Hand value for the acceptance test on the
-bare core: `R = π·15·30/(34.558·0.30) = 136.4`; at `D_mid = 16.62` it is 151.0. Under A+ (sleeve)
-or B the signature is the same kinematic core with a different `d_eff_mm` source. Read
-`FrED_MOBO_Open_Items.docx` item G1 for the user's choice. **If H1 is accepted**, the intake's
-per-run fields (`d_start_mm`, `d_end_mm`, wound width, micrometer readings) come before M3, so the
-calibration runs go straight into the database.
+The power-log format is fixed by `docs/POWER_LOG_REQUIREMENTS.docx` (F1–F10) and `PowerConfig`'s
+defaults; the device-CSV format is `data/examples/fred_experiment_withgraphing.csv` (`;`, decimal
+comma, ~43 Hz log against ~3 Hz sample-and-hold vision, 5.3 µm lattice). Together they are every
+fixture M2's extraction and alignment tests need.
 
-**Open-items state (Rev. 4, answered 22 Sep 2026).** 33 items. **A2 is closed** — the user widened
-the box to `[90, 130]` °C, applied below. **G1 is answered but not settled**: the reply proposes
-modelling the fill rather than picking A / A+ / B, and its premise (“the amount of fiber in the
-spool is determined by the spooling speed”) is contradicted by the reply’s own model — integrating
-it gives `D_end² − D_start² = 4·d_in²·v_f·t/(π·w) = 97.02 mm²`, with no `ω_s` in it, so the fill is
-speed-independent and a Rev. 5 question goes back. **H1 is still blank.** Read them back with `REPLY ([A-H]\d+):\s*(.*)` on the first cell of every
-table row; sentinel `[ type your reply here ]`. What the Rev. 3 replies changed in code:
+**The drawdown relation itself stays behind G1**, which the user has explicitly asked to keep open.
+DECISIONS **D14** now settles the physics under it, so when G1 lands the implementation is short:
+`D_end² − D_start² = 4·d_in²·v_f·t/(π·w) = 97.02 mm²` per 180 s run at `ω_f = 0.30`, independent of
+`ω_s`; `R(t) = π·D(t)·ω_s / v_f`; bare-core hand values `D: 15 → 17.9449 mm`, `R: 136.4 → 163.1` at
+30 RPM. Note the signature question this raises — `draw_ratio` must return a *path*, or a
+window-mean `R̄`, not a scalar `R` — which is why it is still `NotImplementedError`.
+
+**Open-items state — all three yellow rows answered, read from the SAVED document
+(22 Sep 2026, 11:09).** An earlier reading in this session came from Word's AutoRecovery snapshot
+because the file was still open and unsaved; the saved G1 and H1 replies turned out to say more
+than that snapshot did, so *the AutoRecovery text is superseded and must not be reused*.
+
+| Item | Saved reply | Outcome |
+|---|---|---|
+| **A2** | box may be wider; "this 130 is fine" | **CLOSED.** Box `[90, 130]`, commit `310b917`, D11 settled |
+| **G1** | adopts the layer model; asks to *keep the item open*; rules out the printed sleeve | **STILL OPEN**, by the user's instruction. Physics settled in **D14**; one narrowed question goes to Rev. 5 |
+| **H1** | "I'll run those as soon as I can with the full spool and vision system updated" | **ACCEPTED.** D15; creates milestone **M2b** |
+
+Two things in the saved G1 reply that changed the analysis and are worth not re-deriving:
+
+- The user's premise — "the amount of fiber in the spool is determined by the spooling speed" —
+  does not survive their own model. `ω_s` cancels out of the fill (D14). Their *goal*, standardising
+  the final spool diameter, is therefore already delivered by the emptied-spool protocol they
+  follow, at no cost.
+- **The printed sleeve (option A+) is withdrawn.** "lets discuss how to expand A without the
+  printed sleeve." The sleeve-free levers, measured: widen the `ω_s` box (0.40 mm needs 61.3 RPM
+  on a bare core, so a box like `[25, 97.6]` — a device question: what is the spooler's maximum?);
+  lower `ω_f` to 0.177 RPM (0.40 mm at the box centre, but 41 % less fibre per run); or place the
+  steady-state window late in the run (drift across the last third is 2.8 lattice steps against
+  9.7 across the whole run, at the cost of `N_eff`). None can be *sized* before H1 measures `ℓ_f`.
+
+Read replies back with `REPLY ([A-H]\d+):\s*(.*)` on the first cell of every table row; sentinel
+`[ type your reply here ]`. If the sentinels are still there but the user says they answered, the
+file is open in Word — check for the `~$` lock file beside it. What the Rev. 3 replies changed in
+code:
 
 | Item | Reply | Applied to |
 |---|---|---|
-| A2 | EVA; draws from 90 °C; 150 °C safety limit; **upper bound widened to 130** (22 Sep) | `default_2d_campaign` box `[90, 130]`; D11 rewritten as settled; `test_space` corners and midpoint follow |
+| A2 | EVA; draws from 90 °C; 150 °C safety limit; **upper bound widened to 130** (22 Sep, verified against the saved file) | `default_2d_campaign` box `[90, 130]`; D11 rewritten as settled; `test_space` corners and midpoint follow |
 | A3 | facts confirmed; spool emptied between runs; sample sensor uncalibrated | D10 amended; the 23 mm inference withdrawn |
 | A4 | no gearbox; 11 mm is the head's outer diameter | `l_f` kept at 34.558 as an **upper bound**; H1 measures it |
 | E1 | 0.25 mm has been made "depending on temp"; keep ≈ 0.40 | `d_star_mm = 0.40`; sessions 2–3 provisionally 0.30 / 0.50 after H1 |
@@ -43,7 +65,7 @@ table row; sentinel `[ type your reply here ]`. What the Rev. 3 replies changed 
 | E5 | ±10 °C; low-pass suggested | `temp_setpoint_tolerance_c = 10`, `temp_plausible_c = (0, 160)`; no filter; D13 |
 | G2 | Yes | PX removed from `config.py`/`power.py`/tests; PLAN M2/M10; D9 confirmed |
 | G3 | Yes | mode A parked; PLAN M10 |
-| G1 | prefers `ω_s`; asks for more options | re-opened with options A/A+/B/C/D; nothing in code |
+| G1 | Rev. 5: adopts the layer model, keeps the item open, rules out the sleeve | physics recorded in D14; `draw_ratio` still `NotImplementedError`; nothing else in code |
 
 `pytest`: 84 passed, 1 xfailed (`6c4b8e2` fixed a Linux glob-order failure in `test_scaffold.py` and added a shape test for `power_log_example.csv`; CI green).
 
@@ -116,11 +138,14 @@ suite rather than silently absent, and carries the parked acceptance test as
 - Git identity is set **repo-locally** (DECISIONS D5) to the GitHub noreply address, so the
   institutional email is not published in the history of a public repo. Say so if a different
   authorship is wanted — the history is one commit deep and can still be rewritten cheaply.
-- 33 open items are tracked in `../../FrED_MOBO_Open_Items.docx`. **G1** (spool protocol and
-  design variable) still gates M1 — answered 22 Sep but with a proposal rather than a choice, so
-  Rev. 5 asks one sharper question; **H1** (calibration runs) is unanswered and decides `ω_f`, the
-  session targets and whether `l_f`’s bound needs replacing. **A2 is closed at [90, 130] °C.**
-- The 22 Sep replies were read out of Word’s AutoRecovery snapshot because the `.docx` on disk was
-  still unsaved. **Re-verify A2/G1 against the saved file before Rev. 5 is built.**
+- 33 open items are tracked in `../../FrED_MOBO_Open_Items.docx`. **G1** is the only one still
+  open and it still gates M1; **H1** is accepted and unscheduled, and it gates G1 in turn, because
+  no sleeve-free lever can be sized until `ℓ_f` is measured (a 15 % error in `ℓ_f` moves `d` by
+  7.8 %). **A2 is closed.** Rev. 5 of the document is the next thing to build.
+- **The user's open question, carried into Rev. 5:** "how this transfers to the points." D14 gives
+  half the answer — under the emptied-spool protocol the `D`-path is identical for every run, so
+  `ω_s` stays the coordinate and the vernier reading is a protocol check rather than a GP input.
+  The other half is the errors-in-variables case they are gesturing at, which only becomes live if
+  the protocol stops emptying the spool.
 - The repo has no licence yet (`README.md` says so). It is public, so this is worth deciding
   before there is anything in it worth copying.
